@@ -2,7 +2,7 @@
 class Config():
     Stu_model_name = "vgg11" # resnet18、vgg11
     # Mentor_model_name = "ViT" # ViT,"resnet152
-    dataset = "SCAFFOLD_mnist" # fashionmnist、MNIST
+    dataset = "tiny"
     distribution_alpha = 0.5
     n_clients = 9
     data_diribution_balancedness_for_clents = False
@@ -13,6 +13,9 @@ class Config():
     SNR = 25
     SNR_MAX = 25
     SNR_MIN = 0
+    Bandwidth_MAX = 10
+    Power_MAX = 0.1
+    eta = 1
     use_Rali = True
     use_RTN = False
     isc_lr = 1e-3
@@ -21,3 +24,4 @@ class Config():
     device = "cuda"
     checkpoints_dir = "checkpoints"
     logs_dir = "logs"
+    class_num = 200

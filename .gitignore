@@ -1,0 +1,16 @@
+__pycache__/
+datasets/
+checkpoints/
+logs/
+*.pkl
+*.pth
+*.png
+*.jpg
+*.rar
+*.json
+calculate_communication_cost.py
+calculate_communication_cost2.py
+draw_results.py
+draw_results_cifar10.py
+draw_results_fmst.py
+

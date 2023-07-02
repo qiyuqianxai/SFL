@@ -101,6 +101,10 @@ def MKDT(stu_model, mentor_model, mentor_model_name, train_dataloader, test_data
 
     stu_model = stu_model.to(cfg.device)
     mentor_model = mentor_model.to(cfg.device)
+    if (com_round+1)%10==0:
+        cfg.isc_lr/=10
+        cfg.channel_lr/=10
+
     # define optimizer
     optimizer_stu_encoder = torch.optim.Adam(stu_model.isc_model.encoder.parameters(), lr=cfg.isc_lr/100,
                                              weight_decay=cfg.weight_delay)
@@ -135,6 +139,11 @@ def MKDT(stu_model, mentor_model, mentor_model_name, train_dataloader, test_data
                                                              patience=50,
                                                              verbose=True, threshold=1e-7, threshold_mode='rel',
                                                              cooldown=0, min_lr=0, eps=1e-08)
+    scheduler_stu_encoder = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer_stu_encoder, mode='min',
+                                                                       factor=0.1, patience=50,
+                                                                       verbose=True, threshold=1e-7,
+                                                                       threshold_mode='rel',
+                                                                       cooldown=0, min_lr=0, eps=1e-08)
     scheduler_stu_decoder = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer_stu_decoder, mode='min',
                                                                           factor=0.1, patience=50,
                                                                           verbose=True, threshold=1e-7,
@@ -193,10 +202,11 @@ def MKDT(stu_model, mentor_model, mentor_model_name, train_dataloader, test_data
             optimizer_mentor_encoder.step()
             optimizer_mentor_channel.step()
 
-            scheduler_mentor_channel.step(l_mentor)
-            scheduler_mentor_decoder.step(l_mentor)
-            scheduler_stu_channel.step(l_stu)
-            scheduler_stu_decoder.step(l_stu)
+            # scheduler_mentor_channel.step(l_mentor)
+            # scheduler_mentor_decoder.step(l_mentor)
+            # scheduler_stu_channel.step(l_stu)
+            # scheduler_stu_decoder.step(l_stu)
+            # scheduler_stu_encoder.step(l_stu)
 
             print(f"client{client_id}-epoch {epoch} | student loss:{l_stu} | task_loss:{l_stu_task} | dis_loss:{l_stu_dis} | hid_loss:{l_stu_hid} | acc:{stu_acc}")
             print(f"client{client_id}-epoch {epoch} | mentor loss:{l_mentor} | task_loss:{l_mentor_task} | dis_loss:{l_mentor_dis} | hid_loss:{l_mentor_hid} | acc:{mentor_acc}")
@@ -213,7 +223,8 @@ def MKDT(stu_model, mentor_model, mentor_model_name, train_dataloader, test_data
         torch.save(stu_model.state_dict(),stu_weights_path)
 
     # testing
-    test_mentor_loss, test_stu_loss, test_mentor_acc, test_stu_acc = Test_MKDT_ISC(stu_model, mentor_model, test_dataloader, cfg, client_id, com_round)
+    # test_mentor_loss, test_stu_loss, test_mentor_acc, test_stu_acc = Test_MKDT_ISC(stu_model, mentor_model, test_dataloader, cfg, client_id, com_round)
+    test_stu_loss = test_mentor_loss = test_stu_acc = test_mentor_acc = None
     train_mentor_loss = np.mean(train_mentor_loss)
     train_stu_loss = np.mean(train_stu_loss)
     train_stu_acc = np.mean(train_stu_acc)

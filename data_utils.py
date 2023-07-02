@@ -12,7 +12,7 @@ from Config import Config
 # DATASETS
 # -------------------------------------------------------------------------------------------------------
 
-DATA_PATH = r"D:/datasets"
+DATA_PATH = r"D:\pengyubo\datasets"
 np.random.seed(2048)
 
 
@@ -52,6 +52,18 @@ def get_cifar10():
 
     return x_train, y_train, x_test, y_test
 
+def get_cifar100():
+    '''Return CIFAR10 train/test data and labels as numpy arrays'''
+    data_train = torchvision.datasets.CIFAR100(root=os.path.join(DATA_PATH, "CIFAR100"), train=True, download=True)
+    data_test = torchvision.datasets.CIFAR100(root=os.path.join(DATA_PATH, "CIFAR100"), train=False, download=True)
+
+    x_train, y_train = data_train.data.transpose((0, 3, 1, 2)), np.array(data_train.targets)
+    x_test, y_test = data_test.data.transpose((0, 3, 1, 2)), np.array(data_test.targets)
+
+    return x_train, y_train, x_test, y_test
+
+from PIL import Image
+
 def split_noniid(train_data, train_labels, n_clients, alpha):
     '''
     参数为alpha的Dirichlet分布将数据索引划分为n\_clients个子集
@@ -77,15 +89,15 @@ def split_noniid(train_data, train_labels, n_clients, alpha):
     plt.hist([train_labels[idc] for idc in client_idcs], stacked=True,
             bins=np.arange(min(train_labels)-0.5, max(train_labels) + 1.5, 1),
             label=["Client {}".format(i) for i in range(n_clients)], rwidth=0.5)
-    plt.xticks(np.arange(10), list(set(train_labels)),fontsize=24)
+    plt.xticks(np.arange(n_classes), list(set(train_labels)),fontsize=24)
     plt.yticks(fontsize=24)
-    plt.xlim(-0.5,10)
+    plt.xlim(-0.5,n_classes)
     plt.xlabel("Label",fontsize=24)
     plt.ylabel("Data volume",fontsize=24)
     plt.legend(loc="upper right", fontsize=12)
     # plt.legend(ncol=10,loc="upper center")		# ncol参数表示图例中的元素列数，如果有4个元素，分为4列，就是一行，默认是1，即1列，为竖列展示图例，可以根据元素修改参数值，进行展示图例。
     plt.savefig("datadist.png",bbox_inches='tight', pad_inches=0.1)
-    plt.show()
+    # plt.show()
     return client_data
 
 class CustomImageDataset(Dataset):
@@ -112,7 +124,6 @@ class CustomImageDataset(Dataset):
     def __len__(self):
         return self.inputs.shape[0]
 
-
 def get_default_data_transforms(name, train=True, verbose=True):
     transforms_train = {
         'mnist': transforms.Compose([
@@ -137,6 +148,13 @@ def get_default_data_transforms(name, train=True, verbose=True):
             transforms.ToTensor(),
             transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))]),
         # (0.24703223, 0.24348513, 0.26158784)
+        'cifar100': transforms.Compose([
+            transforms.ToPILImage(),
+            # transforms.Resize((224, 224)),
+            # transforms.RandomCrop(224, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))]),
         'kws': None
     }
     transforms_eval = {
@@ -157,6 +175,11 @@ def get_default_data_transforms(name, train=True, verbose=True):
             # transforms.Resize((224, 224)),
             transforms.ToTensor(),
             transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))]),  #
+        'cifar100': transforms.Compose([
+            transforms.ToPILImage(),
+            # transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))]),  #
         'kws': None
     }
 
@@ -167,7 +190,6 @@ def get_default_data_transforms(name, train=True, verbose=True):
         print()
 
     return (transforms_train[name], transforms_eval[name])
-
 
 def get_data_loaders(cfg, verbose=True):
     x_train, y_train, x_test, y_test = globals()['get_' + cfg.dataset]()
@@ -210,13 +232,67 @@ def get_data_loaders(cfg, verbose=True):
     stats = {"split": [x.shape[0] for x, y in split]}
     print(stats)
     # client_loaders = sorted(client_loaders, key=lambda x: x.dataset.__len__())
-    return client_loaders, train_loader, test_loader
+    return client_loaders, train_loader, test_loader, stats
+
+import torchvision.datasets as dset
+
+class custom_datasets(Dataset):
+    def __init__(self, data,labels):
+        self.data = data
+        self.labels = labels
+        self.img_transform = self.transform()
+
+    def __len__(self):
+        return self.data.__len__()
+
+    def __getitem__(self, item):
+        img = Image.open(self.data[item]).convert('RGB')
+        img = self.img_transform(img)
+        label = self.labels[item]
+        label = torch.tensor(label, dtype=torch.long)
+        return img, label
+
+    def transform(self):
+        imagenet_mean = np.array([0.4802, 0.4481, 0.3975])
+        imagenet_std = np.array([0.2770, 0.2691, 0.2821])
+        compose = [
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=imagenet_mean, std=imagenet_std),
+        ]
+        return transforms.Compose(compose)
+
+def get_data_tiny_loader(cfg, verbose=True):
+    data_path = r"D:\pengyubo\datasets\tiny-imagenet-200\train"
+    data_train = dset.ImageFolder(root=data_path).imgs
+    random.shuffle(data_train)
+    y_train = np.array([x[1] for x in data_train])
+    print(y_train)
+    x_train = np.array([x[0] for x in data_train])
+    data_path = r"D:\pengyubo\datasets\tiny-imagenet-200\val"
+    data_val = dset.ImageFolder(root=data_path).imgs
+    y_test = np.array([x[1] for x in data_val])
+    x_test = np.array([x[0] for x in data_val])
+
+    split = split_noniid(x_train, y_train,cfg.n_clients,cfg.distribution_alpha)
+
+    client_loaders = [torch.utils.data.DataLoader(custom_datasets(x, y),
+                                                  batch_size=cfg.batch_size_for_clients, shuffle=True) for x, y in
+                      split]
+    train_loader = torch.utils.data.DataLoader(custom_datasets(x_train, y_train), batch_size=cfg.batch_size_for_clients,
+                                               shuffle=True)
+    test_loader = torch.utils.data.DataLoader(custom_datasets(x_test, y_test),
+                                              batch_size=cfg.test_batch_size, shuffle=False)
+
+
+    stats = {"split": [x.shape[0] for x, y in split]}
+    client_loaders = sorted(client_loaders, key=lambda x: x.dataset.__len__())
+    print([loader.dataset.__len__() for loader in client_loaders])
+    return client_loaders, train_loader, test_loader, stats
 
 if __name__ == "__main__":
     cfg = Config()
-    cfg.dataset = "fashionmnist"
-    print(cfg.dataset)
-    N_CLIENTS = 10
-    DIRICHLET_ALPHA = 0.01
-    client_loaders, train_loader, test_loader = get_data_loaders(cfg, verbose=True)
+    cfg.dataset = "tiny"
+    # client_loaders, train_loader, test_loader = get_data_loaders(cfg, verbose=True)
+    get_data_tiny_loader(cfg)
 
